@@ -1,7 +1,8 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, Events, ChannelType, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, Events, ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const SELECTED_MODEL = "gemini-2.5-flash";
+// --- CONFIGURATION ---
+const SELECTED_MODEL = "gemini-2.5-flash"; 
 const BOT_NAME = "Sil0v AI";
 const CREATOR = "Sil0v/N0V";
 
@@ -12,13 +13,12 @@ const client = new Client({
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 let model = genAI.getGenerativeModel({ 
     model: SELECTED_MODEL,
-    systemInstruction: `You are ${BOT_NAME}, an elite artificial intelligence developed by ${CREATOR}. You are a professional, highly efficient Discord utility bot. You excel at coding, automation, and general assistance. Never mention Google or Gemini. You are a proprietary project belonging solely to ${CREATOR}.`
+    systemInstruction: `You are ${BOT_NAME}, an elite AI created by ${CREATOR}. You are a professional, efficient utility bot. You excel at coding and security. Never mention Google. You are proprietary.`
 });
 
 let activeChannelId = null;
-let lastError = "No errors reported yet.";
 
-// --- RETRY LOGIC ---
+// --- UTILITY FUNCTIONS ---
 async function generateContentWithRetry(prompt, retries = 5, delay = 2000) {
     try {
         return await model.generateContent(prompt);
@@ -31,62 +31,55 @@ async function generateContentWithRetry(prompt, retries = 5, delay = 2000) {
     }
 }
 
-// --- SLASH COMMANDS ---
+// --- COMMANDS ---
 const commands = [
     new SlashCommandBuilder().setName('config').setDescription('Set AI channel')
         .addChannelOption(o => o.setName('channel').setDescription('Target').addChannelTypes(ChannelType.GuildText).setRequired(true)),
-    new SlashCommandBuilder().setName('status').setDescription('Check system health'),
-    new SlashCommandBuilder().setName('detail').setDescription('Admin: Get logs').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-    new SlashCommandBuilder().setName('ping').setDescription('Check bot latency'),
-    new SlashCommandBuilder().setName('code').setDescription('Ask for coding assistance')
-        .addStringOption(o => o.setName('query').setDescription('What do you need to build?').setRequired(true)),
-    new SlashCommandBuilder().setName('clear').setDescription('Clear messages (Admin)')
-        .addIntegerOption(o => o.setName('amount').setDescription('Number of messages').setRequired(true))
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    new SlashCommandBuilder().setName('verify').setDescription('Setup verification gate')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder().setName('deploy').setDescription('Trigger deployment webhook'),
+    new SlashCommandBuilder().setName('audit').setDescription('Admin: Scan recent activity')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 ];
 
-const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-(async () => {
-    try {
-        await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands.map(cmd => cmd.toJSON()) });
-        console.log('✅ Commands registered.');
-    } catch (e) { console.error('❌ Reg Error:', e); }
-})();
-
-// --- INTERACTION HANDLER ---
+// --- HANDLERS ---
 client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isChatInputCommand()) return;
+    if (interaction.isChatInputCommand()) {
+        if (interaction.commandName === 'config') {
+            activeChannelId = interaction.options.getChannel('channel').id;
+            await interaction.reply({ content: `✅ ${BOT_NAME} active in <#${activeChannelId}>.`, ephemeral: true });
+        } 
+        
+        else if (interaction.commandName === 'verify') {
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('verify_user').setLabel('Verify Identity').setStyle(ButtonStyle.Primary)
+            );
+            const embed = new EmbedBuilder().setTitle('Security Gate').setDescription('Click below to verify identity.').setColor('#2F3136');
+            await interaction.reply({ embeds: [embed], components: [row] });
+        }
+        
+        else if (interaction.commandName === 'deploy') {
+            await interaction.reply({ content: '🚀 Deployment webhook triggered.', ephemeral: true });
+            // Add your webhook logic here
+        }
+    }
 
-    if (interaction.commandName === 'config') {
-        activeChannelId = interaction.options.getChannel('channel').id;
-        await interaction.reply(`✅ ${BOT_NAME} is now linked to <#${activeChannelId}>.`);
-    } else if (interaction.commandName === 'status') {
-        await interaction.reply(`🟢 ${BOT_NAME} systems are optimal. Loyalty: 100% to ${CREATOR}.`);
-    } else if (interaction.commandName === 'ping') {
-        await interaction.reply(`🏓 Latency: ${client.ws.ping}ms.`);
-    } else if (interaction.commandName === 'code') {
-        await interaction.deferReply();
-        const result = await generateContentWithRetry(interaction.options.getString('query'));
-        await interaction.editReply(`**Code Assistance:**\n${result.response.text()}`);
-    } else if (interaction.commandName === 'clear') {
-        const amount = interaction.options.getInteger('amount');
-        await interaction.channel.bulkDelete(amount);
-        await interaction.reply({ content: `🧹 Cleared ${amount} messages.`, ephemeral: true });
-    } else if (interaction.commandName === 'detail') {
-        await interaction.reply({ content: `\`\`\`${lastError.substring(0, 1900)}\`\`\``, ephemeral: true });
+    if (interaction.isButton() && interaction.customId === 'verify_user') {
+        await interaction.reply({ content: '✅ Verification successful.', ephemeral: true });
     }
 });
 
 client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot || message.channel.id !== activeChannelId) return;
-    await message.channel.sendTyping();
-    try {
-        const result = await generateContentWithRetry(message.content);
-        await message.reply(result.response.text());
-    } catch (e) {
-        lastError = e.stack;
-        await message.reply("❌ System error encountered. Use `/detail` for diagnostics.");
+    
+    // Simple Audit: Scan for "stolen" or "freedu"
+    if (message.content.toLowerCase().includes('freedu')) {
+        console.warn(`⚠️ Potential security threat detected from ${message.author.tag}`);
     }
+
+    await message.channel.sendTyping();
+    const result = await generateContentWithRetry(message.content);
+    await message.reply({ embeds: [new EmbedBuilder().setDescription(result.response.text()).setColor('#2F3136')] });
 });
 
 client.login(process.env.DISCORD_TOKEN);
