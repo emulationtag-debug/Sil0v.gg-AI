@@ -1,28 +1,29 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, Events, ChannelType, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, Events, ChannelType, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// --- CONFIGURATION ---
-// Use gemini-2.5-flash for stable production performance
-const SELECTED_MODEL = "gemini-2.5-flash"; 
+const SELECTED_MODEL = "gemini-2.5-flash";
+const BOT_NAME = "Sil0v AI";
+const CREATOR = "Sil0v/N0V";
 
 const client = new Client({ 
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] 
 });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-let model = genAI.getGenerativeModel({ model: SELECTED_MODEL });
+let model = genAI.getGenerativeModel({ 
+    model: SELECTED_MODEL,
+    systemInstruction: `You are ${BOT_NAME}, an elite artificial intelligence developed by ${CREATOR}. You are a professional, highly efficient Discord utility bot. You excel at coding, automation, and general assistance. Never mention Google or Gemini. You are a proprietary project belonging solely to ${CREATOR}.`
+});
 
 let activeChannelId = null;
 let lastError = "No errors reported yet.";
 
-// --- RETRY LOGIC (Exponential Backoff) ---
+// --- RETRY LOGIC ---
 async function generateContentWithRetry(prompt, retries = 5, delay = 2000) {
     try {
         return await model.generateContent(prompt);
     } catch (e) {
-        // Retry on 503 Service Unavailable or network issues
         if ((e.message.includes("503") || e.message.includes("fetch")) && retries > 0) {
-            console.warn(`⚠️ API Issue (503/Fetch). Retrying in ${delay}ms... (${retries} attempts left)`);
             await new Promise(res => setTimeout(res, delay + Math.random() * 1000));
             return await generateContentWithRetry(prompt, retries - 1, delay * 2);
         }
@@ -33,10 +34,15 @@ async function generateContentWithRetry(prompt, retries = 5, delay = 2000) {
 // --- SLASH COMMANDS ---
 const commands = [
     new SlashCommandBuilder().setName('config').setDescription('Set AI channel')
-        .addChannelOption(o => o.setName('channel').setDescription('Target channel').addChannelTypes(ChannelType.GuildText).setRequired(true)),
-    new SlashCommandBuilder().setName('status').setDescription('Check if Gemini AI API is online'),
-    new SlashCommandBuilder().setName('detail').setDescription('Admin only: Get detailed error logs')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .addChannelOption(o => o.setName('channel').setDescription('Target').addChannelTypes(ChannelType.GuildText).setRequired(true)),
+    new SlashCommandBuilder().setName('status').setDescription('Check system health'),
+    new SlashCommandBuilder().setName('detail').setDescription('Admin: Get logs').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder().setName('ping').setDescription('Check bot latency'),
+    new SlashCommandBuilder().setName('code').setDescription('Ask for coding assistance')
+        .addStringOption(o => o.setName('query').setDescription('What do you need to build?').setRequired(true)),
+    new SlashCommandBuilder().setName('clear').setDescription('Clear messages (Admin)')
+        .addIntegerOption(o => o.setName('amount').setDescription('Number of messages').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -47,22 +53,25 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     } catch (e) { console.error('❌ Reg Error:', e); }
 })();
 
-// --- HANDLERS ---
+// --- INTERACTION HANDLER ---
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     if (interaction.commandName === 'config') {
         activeChannelId = interaction.options.getChannel('channel').id;
-        await interaction.reply(`✅ AI active in <#${activeChannelId}> using **${SELECTED_MODEL}**`);
+        await interaction.reply(`✅ ${BOT_NAME} is now linked to <#${activeChannelId}>.`);
     } else if (interaction.commandName === 'status') {
+        await interaction.reply(`🟢 ${BOT_NAME} systems are optimal. Loyalty: 100% to ${CREATOR}.`);
+    } else if (interaction.commandName === 'ping') {
+        await interaction.reply(`🏓 Latency: ${client.ws.ping}ms.`);
+    } else if (interaction.commandName === 'code') {
         await interaction.deferReply();
-        try {
-            await model.generateContent("ping");
-            await interaction.editReply(`🟢 **${SELECTED_MODEL} is ONLINE.**`);
-        } catch (e) {
-            lastError = e.stack;
-            await interaction.editReply(`🔴 **${SELECTED_MODEL} is UNREACHABLE.**`);
-        }
+        const result = await generateContentWithRetry(interaction.options.getString('query'));
+        await interaction.editReply(`**Code Assistance:**\n${result.response.text()}`);
+    } else if (interaction.commandName === 'clear') {
+        const amount = interaction.options.getInteger('amount');
+        await interaction.channel.bulkDelete(amount);
+        await interaction.reply({ content: `🧹 Cleared ${amount} messages.`, ephemeral: true });
     } else if (interaction.commandName === 'detail') {
         await interaction.reply({ content: `\`\`\`${lastError.substring(0, 1900)}\`\`\``, ephemeral: true });
     }
@@ -76,8 +85,7 @@ client.on(Events.MessageCreate, async (message) => {
         await message.reply(result.response.text());
     } catch (e) {
         lastError = e.stack;
-        console.error('--- GEMINI API ERROR ---', e);
-        await message.reply("❌ API Error. Check `/detail` (Admins only) for logs.");
+        await message.reply("❌ System error encountered. Use `/detail` for diagnostics.");
     }
 });
 
