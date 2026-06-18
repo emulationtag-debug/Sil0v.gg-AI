@@ -1,88 +1,81 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, Events, ChannelType, PermissionFlagsBits } = require('discord.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// 1. Setup
+// --- CONFIGURATION ---
+// Change this to 'gemini-3.1-flash-lite' if you keep hitting 503 errors on 3.5
+const SELECTED_MODEL = "gemini-3.5-flash"; 
+
 const client = new Client({ 
-    intents: [
-        GatewayIntentBits.Guilds, 
-        GatewayIntentBits.GuildMessages, 
-        GatewayIntentBits.MessageContent
-    ] 
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] 
 });
 
-// Using the updated 3.5 Flash model
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ 
-    model: "gemini-3.5-flash", 
-    systemInstruction: "You are Sil0v.gg AI, a professional, minimalist, and efficient assistant." 
-});
+let model = genAI.getGenerativeModel({ model: SELECTED_MODEL });
 
 let activeChannelId = null;
 let lastError = "No errors reported yet.";
 
-// 2. Register Slash Commands
+// --- RETRY LOGIC (Exponential Backoff) ---
+async function generateContentWithRetry(prompt, retries = 5, delay = 2000) {
+    try {
+        return await model.generateContent(prompt);
+    } catch (e) {
+        if (e.message.includes("503") && retries > 0) {
+            console.warn(`⚠️ 503 Detected. Retrying in ${delay}ms... (${retries} attempts left)`);
+            await new Promise(res => setTimeout(res, delay + Math.random() * 1000)); // Added jitter
+            return await generateContentWithRetry(prompt, retries - 1, delay * 2);
+        }
+        throw e;
+    }
+}
+
+// --- SLASH COMMANDS ---
 const commands = [
-    new SlashCommandBuilder()
-        .setName('config')
-        .setDescription('Set the AI channel')
-        .addChannelOption(o => o.setName('channel').setDescription('Target channel').addChannelTypes(ChannelType.GuildText).setRequired(true)),
-    new SlashCommandBuilder()
-        .setName('status')
-        .setDescription('Check if Gemini AI API is online'),
-    new SlashCommandBuilder()
-        .setName('detail')
-        .setDescription('Admin only: Get detailed error logs')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    new SlashCommandBuilder().setName('config').setDescription('Set AI channel')
+        .addChannelOption(o => o.setName('channel').setDescription('Target').addChannelTypes(ChannelType.GuildText).setRequired(true)),
+    new SlashCommandBuilder().setName('status').setDescription('Check API health'),
+    new SlashCommandBuilder().setName('detail').setDescription('Admin: Get logs').setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-
 (async () => {
     try {
-        await rest.put(
-            Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-            { body: commands.map(cmd => cmd.toJSON()) }
-        );
+        await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands.map(cmd => cmd.toJSON()) });
         console.log('✅ Commands registered.');
-    } catch (e) { console.error('❌ Command Reg Error:', e); }
+    } catch (e) { console.error('❌ Reg Error:', e); }
 })();
 
-// 3. Handlers
+// --- EVENT HANDLERS ---
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
-
     if (interaction.commandName === 'config') {
         activeChannelId = interaction.options.getChannel('channel').id;
-        await interaction.reply(`✅ Sil0v.gg AI active in <#${activeChannelId}>`);
-    } 
-    else if (interaction.commandName === 'status') {
+        await interaction.reply(`✅ AI active in <#${activeChannelId}> using **${SELECTED_MODEL}**`);
+    } else if (interaction.commandName === 'status') {
         await interaction.deferReply();
         try {
             await model.generateContent("ping");
-            await interaction.editReply("🟢 **Gemini 3.5 Flash is ONLINE and responsive.**");
+            await interaction.editReply(`🟢 **${SELECTED_MODEL} is ONLINE.**`);
         } catch (e) {
             lastError = e.stack;
-            await interaction.editReply("🔴 **Gemini AI API is currently UNREACHABLE.**");
+            await interaction.editReply(`🔴 **${SELECTED_MODEL} is UNREACHABLE.**`);
         }
-    } 
-    else if (interaction.commandName === 'detail') {
-        await interaction.reply({ content: `\`\`\`${lastError}\`\`\``, ephemeral: true });
+    } else if (interaction.commandName === 'detail') {
+        await interaction.reply({ content: `\`\`\`${lastError.substring(0, 1900)}\`\`\``, ephemeral: true });
     }
 });
 
 client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot || message.channel.id !== activeChannelId) return;
-
     await message.channel.sendTyping();
     try {
-        const result = await model.generateContent(message.content);
+        const result = await generateContentWithRetry(message.content);
         await message.reply(result.response.text());
     } catch (e) {
         lastError = e.stack;
         console.error('--- GEMINI API ERROR ---', e);
-        await message.reply("❌ API Error. Admins can use `/detail` to see the error.");
+        await message.reply("❌ API Error. Check `/detail` for logs.");
     }
 });
 
-client.once(Events.ClientReady, (c) => console.log(`✅ Logged in as ${c.user.tag}!`));
 client.login(process.env.DISCORD_TOKEN);
