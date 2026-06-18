@@ -1,11 +1,5 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, Events } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, Events, ChannelType } = require('discord.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-
-// Configuration (Ensure these are set in Railway Variables)
-const TOKEN = process.env.DISCORD_TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID; // Add this to Railway Variables!
-const GUILD_ID = process.env.GUILD_ID;   // Add this to Railway Variables!
-const BOT_NAME = "Sil0v.gg AI";
 
 const client = new Client({ 
     intents: [
@@ -18,58 +12,64 @@ const client = new Client({
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash",
-    systemInstruction: `You are ${BOT_NAME}, a professional, minimalist, and efficient AI assistant.`
+    systemInstruction: "You are Sil0v.gg AI, a professional, minimalist, and efficient AI assistant."
 });
 
-// 1. Define your commands
+let activeChannelId = null;
+
+// Register Commands
 const commands = [
     new SlashCommandBuilder()
-        .setName('help')
-        .setDescription('Get help with Sil0v.gg AI commands'),
+        .setName('config')
+        .setDescription('Set the channel for Sil0v.gg AI')
+        .addChannelOption(option => 
+            option.setName('channel')
+                .setDescription('The channel to set the AI in')
+                .addChannelTypes(ChannelType.GuildText)
+                .setRequired(true)),
+    new SlashCommandBuilder()
+        .setName('status')
+        .setDescription('Check if Sil0v.gg AI is online')
 ];
 
-// 2. Register commands with Discord
-const rest = new REST({ version: '10' }).setToken(TOKEN);
+const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
     try {
-        console.log('Started refreshing slash commands...');
         await rest.put(
-            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-            { body: commands.map(command => command.toJSON()) },
+            Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
+            { body: commands.map(cmd => cmd.toJSON()) }
         );
         console.log('Successfully registered slash commands.');
-    } catch (error) {
-        console.error(error);
-    }
+    } catch (error) { console.error(error); }
 })();
 
-// 3. Handle Command Interactions
+// Command Handler
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    if (interaction.commandName === 'help') {
-        await interaction.reply('I am Sil0v.gg AI. I respond to messages in the active channel!');
+    if (interaction.commandName === 'config') {
+        const channel = interaction.options.getChannel('channel');
+        activeChannelId = channel.id;
+        await interaction.reply(`✅ Sil0v.gg AI is now active in <#${activeChannelId}>`);
+    } else if (interaction.commandName === 'status') {
+        await interaction.reply(`🤖 Sil0v.gg AI is currently **ONLINE** and ready.`);
     }
 });
 
-// 4. Existing Message Logic
-let activeChannelId = null;
-
+// AI Response Logic
 client.on(Events.MessageCreate, async (message) => {
-    if (message.author.bot) return;
+    if (message.author.bot || message.channel.id !== activeChannelId) return;
 
-    if (message.content === '!setchannel') {
-        activeChannelId = message.channel.id;
-        return message.reply(`✅ ${BOT_NAME} is now active in this channel!`);
-    }
-
-    if (activeChannelId && message.channel.id === activeChannelId) {
-        await message.channel.sendTyping();
+    await message.channel.sendTyping();
+    try {
         const result = await model.generateContent(message.content);
         await message.reply(result.response.text());
+    } catch (e) {
+        console.error(e);
+        message.reply("I'm currently having trouble processing requests.");
     }
 });
 
 client.once(Events.ClientReady, (c) => console.log(`✅ Logged in as ${c.user.tag}!`));
-client.login(TOKEN);
+client.login(process.env.DISCORD_TOKEN);
