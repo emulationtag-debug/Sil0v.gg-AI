@@ -1,13 +1,13 @@
 {
-  "name": "Sil0v AI",
+  "name": "silov-ai-bot",
   "version": "1.0.0",
-  "description": "This is a discord ai bot.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+  "dependencies": {
+    "discord.js": "^14.17.0",
+    "@google/generative-ai": "^0.21.0",
+    "dotenv": "^16.4.7"
+  }
 }
