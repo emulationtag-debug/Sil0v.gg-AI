@@ -1,13 +1,29 @@
 {
-  "name": "silov-ai-bot",
-  "version": "1.0.0",
+  "name": "sil0v-ai-ultra",
+  "version": "4.2.0",
+  "description": "Advanced Discord Bot with AI integration, moderation, economy, and more",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "node index.js"
   },
+  "keywords": [
+    "discord",
+    "bot",
+    "ai",
+    "gemini",
+    "moderation",
+    "economy",
+    "music",
+    "games"
+  ],
+  "author": "Sil0v/N0V",
+  "license": "Proprietary",
   "dependencies": {
-    "discord.js": "^14.17.0",
-    "@google/generative-ai": "^0.21.0",
-    "dotenv": "^16.4.7"
+    "discord.js": "^14.14.1",
+    "@google/generative-ai": "^0.15.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
