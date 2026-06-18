@@ -2,8 +2,8 @@ const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, Events, Ch
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // --- CONFIGURATION ---
-// Change this to 'gemini-3.1-flash-lite' if you keep hitting 503 errors on 3.5
-const SELECTED_MODEL = "gemini-3.5-flash"; 
+// Use gemini-2.5-flash for stable production performance
+const SELECTED_MODEL = "gemini-2.5-flash"; 
 
 const client = new Client({ 
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] 
@@ -20,9 +20,10 @@ async function generateContentWithRetry(prompt, retries = 5, delay = 2000) {
     try {
         return await model.generateContent(prompt);
     } catch (e) {
-        if (e.message.includes("503") && retries > 0) {
-            console.warn(`⚠️ 503 Detected. Retrying in ${delay}ms... (${retries} attempts left)`);
-            await new Promise(res => setTimeout(res, delay + Math.random() * 1000)); // Added jitter
+        // Retry on 503 Service Unavailable or network issues
+        if ((e.message.includes("503") || e.message.includes("fetch")) && retries > 0) {
+            console.warn(`⚠️ API Issue (503/Fetch). Retrying in ${delay}ms... (${retries} attempts left)`);
+            await new Promise(res => setTimeout(res, delay + Math.random() * 1000));
             return await generateContentWithRetry(prompt, retries - 1, delay * 2);
         }
         throw e;
@@ -32,9 +33,10 @@ async function generateContentWithRetry(prompt, retries = 5, delay = 2000) {
 // --- SLASH COMMANDS ---
 const commands = [
     new SlashCommandBuilder().setName('config').setDescription('Set AI channel')
-        .addChannelOption(o => o.setName('channel').setDescription('Target').addChannelTypes(ChannelType.GuildText).setRequired(true)),
-    new SlashCommandBuilder().setName('status').setDescription('Check API health'),
-    new SlashCommandBuilder().setName('detail').setDescription('Admin: Get logs').setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .addChannelOption(o => o.setName('channel').setDescription('Target channel').addChannelTypes(ChannelType.GuildText).setRequired(true)),
+    new SlashCommandBuilder().setName('status').setDescription('Check if Gemini AI API is online'),
+    new SlashCommandBuilder().setName('detail').setDescription('Admin only: Get detailed error logs')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -45,9 +47,10 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     } catch (e) { console.error('❌ Reg Error:', e); }
 })();
 
-// --- EVENT HANDLERS ---
+// --- HANDLERS ---
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
+
     if (interaction.commandName === 'config') {
         activeChannelId = interaction.options.getChannel('channel').id;
         await interaction.reply(`✅ AI active in <#${activeChannelId}> using **${SELECTED_MODEL}**`);
@@ -74,7 +77,7 @@ client.on(Events.MessageCreate, async (message) => {
     } catch (e) {
         lastError = e.stack;
         console.error('--- GEMINI API ERROR ---', e);
-        await message.reply("❌ API Error. Check `/detail` for logs.");
+        await message.reply("❌ API Error. Check `/detail` (Admins only) for logs.");
     }
 });
 
