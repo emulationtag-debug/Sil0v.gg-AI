@@ -1,7 +1,10 @@
-const { Client, GatewayIntentBits, Events } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, Events } = require('discord.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Use process.env for variables (Railway injects these automatically)
+// Configuration (Ensure these are set in Railway Variables)
+const TOKEN = process.env.DISCORD_TOKEN;
+const CLIENT_ID = process.env.CLIENT_ID; // Add this to Railway Variables!
+const GUILD_ID = process.env.GUILD_ID;   // Add this to Railway Variables!
 const BOT_NAME = "Sil0v.gg AI";
 
 const client = new Client({ 
@@ -15,49 +18,58 @@ const client = new Client({
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash",
-    systemInstruction: `You are ${BOT_NAME}, a professional, minimalist, and efficient AI assistant. If a user asks to modify server roles or settings, explain that you are an AI assistant and cannot perform server administration directly, but offer helpful guidance.`
+    systemInstruction: `You are ${BOT_NAME}, a professional, minimalist, and efficient AI assistant.`
 });
 
+// 1. Define your commands
+const commands = [
+    new SlashCommandBuilder()
+        .setName('help')
+        .setDescription('Get help with Sil0v.gg AI commands'),
+];
+
+// 2. Register commands with Discord
+const rest = new REST({ version: '10' }).setToken(TOKEN);
+
+(async () => {
+    try {
+        console.log('Started refreshing slash commands...');
+        await rest.put(
+            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+            { body: commands.map(command => command.toJSON()) },
+        );
+        console.log('Successfully registered slash commands.');
+    } catch (error) {
+        console.error(error);
+    }
+})();
+
+// 3. Handle Command Interactions
+client.on(Events.InteractionCreate, async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+
+    if (interaction.commandName === 'help') {
+        await interaction.reply('I am Sil0v.gg AI. I respond to messages in the active channel!');
+    }
+});
+
+// 4. Existing Message Logic
 let activeChannelId = null;
-
-// Debugging: Listen for connection issues
-client.on(Events.Error, (error) => {
-    console.error('Discord Client Error:', error);
-});
-
-client.on(Events.ShardDisconnect, (event) => {
-    console.error('Bot Disconnected:', event);
-});
-
-client.once(Events.ClientReady, (c) => {
-    console.log(`✅ Logged in as ${c.user.tag}!`);
-    client.user.setPresence({ status: 'online' });
-});
 
 client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot) return;
 
-    // Command to set the channel
     if (message.content === '!setchannel') {
         activeChannelId = message.channel.id;
         return message.reply(`✅ ${BOT_NAME} is now active in this channel!`);
     }
 
-    // AI logic
     if (activeChannelId && message.channel.id === activeChannelId) {
-        try {
-            await message.channel.sendTyping();
-            
-            const result = await model.generateContent(message.content);
-            const response = await result.response.text();
-            
-            await message.reply(response);
-        } catch (error) {
-            console.error('Gemini API Error:', error);
-            message.reply("I'm having trouble thinking right now. Check my logs!");
-        }
+        await message.channel.sendTyping();
+        const result = await model.generateContent(message.content);
+        await message.reply(result.response.text());
     }
 });
 
-// Login using the token from Railway Variables
-client.login(process.env.DISCORD_TOKEN);
+client.once(Events.ClientReady, (c) => console.log(`✅ Logged in as ${c.user.tag}!`));
+client.login(TOKEN);
