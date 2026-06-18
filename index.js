@@ -9,6 +9,15 @@ const client = new Client({
     ] 
 });
 
+xport const botConfig = {
+  presence: {
+    status: "online",
+    activities: [
+      {
+        name: "Made with ❤️ - N0V",
+        type: 0, 
+      },
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash",
