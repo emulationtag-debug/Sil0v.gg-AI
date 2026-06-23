@@ -1,68 +1,74 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
+<html lang="en" class="scroll-smooth">
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sil0v.gg AI | Discord Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>* { font-family: 'Inter', system-ui, sans-serif; }</style>
-  </head>
-  <body class="min-h-screen bg-slate-950 text-white antialiased">
-    
-    <!-- Background Effects -->
-    <div class="fixed inset-0 -z-10">
-      <div class="absolute top-0 left-1/4 w-96 h-96 bg-violet-500/20 rounded-full blur-3xl"></div>
-      <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl"></div>
-    </div>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        .glass { background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        
+        /* Professional Background Glow */
+        .glow {
+            position: fixed;
+            width: 400px;
+            height: 400px;
+            background: rgba(37, 99, 235, 0.15);
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: -1;
+            top: 10%;
+            left: 20%;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+    <div class="glow"></div>
 
     <!-- Navigation -->
-    <nav class="fixed top-0 w-full z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
-      <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-        <a href="#" class="text-xl font-bold bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">Sil0v.gg AI</a>
-        <a href="https://discord.com/oauth2/authorize?client_id=1516965777419538432&permissions=8&integration_type=0&scope=bot+applications.commands" 
-           class="px-4 py-2 bg-white text-slate-900 rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors">
-           Add to Server
-        </a>
-      </div>
+    <nav class="max-w-6xl mx-auto flex items-center justify-between px-10 py-8">
+        <div class="text-2xl font-bold tracking-tighter text-blue-400">SIL0V.GG AI</div>
+        <div class="space-x-8 text-sm font-medium text-slate-400">
+            <a href="#commands" class="hover:text-white transition">Commands</a>
+            <a href="https://discord.com/oauth2/authorize?client_id=1516965777419538432&permissions=8&integration_type=0&scope=bot+applications.commands" 
+               class="bg-blue-600/10 text-blue-400 border border-blue-500/20 px-6 py-2 rounded-full hover:bg-blue-600 hover:text-white transition">Invite Bot</a>
+        </div>
     </nav>
 
-    <!-- Hero Section -->
-    <section class="pt-32 pb-20 px-6 text-center">
-      <h1 class="text-5xl md:text-7xl font-bold tracking-tight mb-6">
-        The smartest AI <br>
-        <span class="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">for your Discord server</span>
-      </h1>
-      <p class="text-xl text-slate-400 max-w-2xl mx-auto mb-10">Elevate your community with Sil0v.gg AI. Intelligent, secure, and ready to deploy.</p>
-      <a href="https://discord.com/oauth2/authorize?client_id=1516965777419538432&permissions=8&integration_type=0&scope=bot+applications.commands" 
-         class="inline-block px-8 py-4 bg-gradient-to-r from-violet-600 to-cyan-600 rounded-xl font-semibold text-lg hover:opacity-90 transition-opacity shadow-lg shadow-violet-500/25">
-         Invite Sil0v.gg to Server →
-      </a>
-    </section>
+    <!-- Hero -->
+    <header class="max-w-6xl mx-auto px-10 py-16 grid md:grid-cols-2 gap-16 items-center">
+        <div>
+            <h1 class="text-6xl font-bold mb-6 leading-tight">The Next Generation of <span class="text-blue-500">Discord AI</span></h1>
+            <p class="text-slate-400 mb-8 text-lg leading-relaxed">Deploy elite intelligence to your server. Sil0v.gg AI provides automated moderation, behavioral analytics, and advanced engagement tools for modern communities.</p>
+            <a href="https://discord.com/oauth2/authorize?client_id=1516965777419538432&permissions=8&integration_type=0&scope=bot+applications.commands" 
+               class="inline-block bg-white text-slate-950 px-8 py-4 rounded-xl font-bold hover:bg-blue-50 transition shadow-[0_0_20px_rgba(255,255,255,0.1)]">Get Started Now</a>
+        </div>
+        <div class="glass p-2 rounded-3xl border-slate-800">
+            <!-- Referencing testani.jpg in the src folder -->
+            <img src="src/testani.jpg" alt="Sil0v.gg Bot" class="rounded-2xl w-full">
+        </div>
+    </header>
 
     <!-- Commands Section -->
-    <section id="commands" class="py-20 px-6">
-      <div class="max-w-6xl mx-auto">
-        <h2 class="text-3xl font-bold text-center mb-12">Essential Commands</h2>
-        <div class="grid md:grid-cols-3 gap-6">
-          <div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800">
-            <code class="text-violet-400 font-bold text-lg">/detail</code>
-            <p class="text-slate-400 mt-2">Access and review the detailed activity logs of the bot.</p>
-          </div>
-          <div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800">
-            <code class="text-cyan-400 font-bold text-lg">/config</code>
-            <p class="text-slate-400 mt-2">Manage server settings and assign bot channels with ease.</p>
-          </div>
-          <div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800">
-            <code class="text-emerald-400 font-bold text-lg">/status</code>
-            <p class="text-slate-400 mt-2">Check real-time uptime and connection status of the bot.</p>
-          </div>
+    <section id="commands" class="max-w-4xl mx-auto px-10 py-20">
+        <h2 class="text-3xl font-bold mb-8 text-center">System Commands</h2>
+        <div class="glass p-8 rounded-3xl space-y-4">
+            <div class="flex items-center gap-4 bg-slate-900/50 p-4 rounded-xl border border-white/5">
+                <code class="text-blue-400 font-bold text-lg min-w-[100px]">/detail</code>
+                <span class="text-slate-400">View comprehensive activity logs and audit data.</span>
+            </div>
+            <div class="flex items-center gap-4 bg-slate-900/50 p-4 rounded-xl border border-white/5">
+                <code class="text-blue-400 font-bold text-lg min-w-[100px]">/config</code>
+                <span class="text-slate-400">Configure bot channels and operational settings.</span>
+            </div>
+            <div class="flex items-center gap-4 bg-slate-900/50 p-4 rounded-xl border border-white/5">
+                <code class="text-blue-400 font-bold text-lg min-w-[100px]">/status</code>
+                <span class="text-slate-400">Real-time check of bot connectivity and uptime.</span>
+            </div>
         </div>
-      </div>
     </section>
 
-    <footer class="py-12 text-center text-slate-600 text-sm">
-      <p>© 2026 Sil0v.gg AI. All rights reserved.</p>
-    </footer>
-  </body>
+</body>
 </html>
